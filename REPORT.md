@@ -11,6 +11,10 @@ validity, what it is used for.
 |---|---|---|---|---|
 | root CA, EC P-384, self-signed, `root/certs/ca.cert.pem` | `root/private/ca.key.pem`, encrypted (AES-256, passphrase) | the `root-ca` container (no network); on the host, my user account, but only I know the passphrase | 2046-11-11, 20 years (`openssl x509 -noout -enddate`) | signs the intermediate and the root CRL, nothing else; stopped the rest of the time |
 | intermediate (issuing) CA, EC P-384, signed by root CA, `intermediate/certs/int.cert.pem` | `intermediate/private/ca.key.pem`, encrypted (AES-256, passphrase) | le conteneur `issuing-ca`, mon utilisateur mais uniquement si je connais la passphrase | 2036-11-14, 10 ans | signe les certificats clients et serveurs |
+| certificat Alice, P-256, signé par issuing CA, `identities/alice/alice.cert.pem` | `identities/alice/alice.key.pem`, non chiffré | le conteneur "client" | 2027-02-15 (90 jours) | autentifie Alice |
+| certificat Bob, P-256, signé par issuing CA, `identities/bob/bob.cert.pem` | `identities/bob/bob.key.pem`, non chiffré | le conteneur "client" | 2027-02-15 (90 jours) | autentifie Bob |
+| certificat billing, P-256, signé par issuing CA, `identities/blling/billing.cert.pem` | `identities/billing/billing.key.pem`, non chiffré | le conteneur "client" | 2027-02-15 (90 jours) | autentifie billing |
+| certificat www, P-256, signé par issuing CA, `identities/www/www.cert.pem` | `identities/www/www.key.pem`, non chiffré | le conteneur "client" | 2027-02-15 (90 jours) | permet le https sur le site |
 
 **Lifetimes.** The root lasts 20 years, the intermediate 10, the server and client certificates 90 days.
 Justify each number: what would a shorter or a longer lifetime cost you? Why 90 days for the server, and not
@@ -56,31 +60,44 @@ what stops working or becomes unsafe, how do you recover, how long does it take?
 
 ### Client key
 
-- How you notice:
-- What becomes unsafe:
-- Recovery:
-- How long:
+- How you notice: accès suspicieux à des heures innabituels, signalement du personnel atteint (vole/perte)
+- What becomes unsafe: dépend des accès fourni, si Alice perd son PC, la personne aurait accès à /admin ce qui est critique
+- Recovery: publication de CRL contenant l'ancienne clé, création d'une nouvelle clé
+- How long: 10-15 minutes en cas de signalement/détection, 90 jours sinon (expiration du certificat)
 
 ### Intermediate key
 
-- How you notice:
-- What becomes unsafe:
-- Recovery:
-- How long:
+- How you notice: signature de domaine/utilisateur non carthographié (evil.lab.internal), sinon rien ne permet de le savoir
+- What becomes unsafe: l'ensemble du système
+- Recovery: révocation du certificat intermédiaire, création d'un nouveau (besoin de la clé root)
+- How long: 1h après détection (peut être plus rapide si on a un accès directe à la clé root), 10 ans sinon (expiration)
 
 ### Root key
 
-- How you notice:
-- What becomes unsafe:
-- Recovery:
-- How long:
+- How you notice: signature de domaine/utilisateur non carthographié (evil.lab.internal), sinon rien ne permet de le savoir
+- What becomes unsafe: toute la trust-chain
+- Recovery: suppression du certificat root sur l'ensemble des truststore du park + création d'une nouvelle PKI
+- How long: 1/2 jours (voir plus si certains appareils sont hors ligne) si détection, 20 ans sinon (expiration)
 
 ## 4. Operational gaps
 
 search answer to those questions/weaknesses
 
 - the root key's passphrase: where is it, who knows it? What if that person leaves the company?
+
+Stocké chiffrée et hors ligne, potentiellement séparée à du personnel qualifié et de confiance (RSSI, SOC, ...)
+Personne ne doit la connaître intégralement, seulement par morceau. Plusieurs personnes peuvent la reconstitué
+Si il a un morceau de la clé il n'est pas sensé pouvoir la recréer, cela ne pose pas de soucis
+
 - the CRL expires after 7 days: what happens on day 8, and who regenerates it?
+
+La liste actuelle est réputée "out of date" et provoquera une impossibilité à ce connecté
+la CA est responsable de la regénéré, en fonction de qu'est ce qui est touché (client touché -> issuing CA, issuing CA touchée -> root CA)
+
 - the lab root is in no trust store: how would every laptop, server and container get it?
+
+l'ajouté via GPO (windows), ansible (linux), image docker, ...
+
 - the intermediate's key is not encrypted, unlike the root's. Search how it would be possible to use KMS for intermediate issuing CA.
 
+On pourrait utilisé un KMS qui va signé les CRL et les certificats pour notre issuing CA, de cette manière la clé ne circule jamais vu qu'on passe par une API cryptographique
