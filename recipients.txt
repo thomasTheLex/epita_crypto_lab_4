@@ -5,5 +5,7 @@
 age1ttsd2gh9kket0e38dy448umhlghas472msvalj3ryqxcjjaf8ycq4tjhdn
 
 # The CI: add the public key of ci.key here (age-keygen -y ci.key).
+age1x83kg0r994wwaw20ehwzr57wtjuetdda3830tnlzqk5ed0rz8d8qrz90x0
 
 # You: add your own public key here (age-keygen -y ~/.config/age/keys.txt).
+age1c8ck76hslpxngpnjujd3ys56g7ve3henkvfgzlc2569g6524jchqh0haac
